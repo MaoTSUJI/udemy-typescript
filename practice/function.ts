@@ -23,4 +23,4 @@ combineValues = add;
 
 console.log(combineValues(8, 8));
 
-printResult(add(1, 12);
+const aaa = printResult(add(1, 12));
