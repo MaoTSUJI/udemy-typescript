@@ -23,7 +23,7 @@ class State<T> {
   }
 }
 
-class ProjectState extends State<Project>{
+class ProjectState extends State<Project> {
   private projects: Project[] = [];
   private static instance: ProjectState;
 
@@ -38,7 +38,6 @@ class ProjectState extends State<Project>{
     this.instance = new ProjectState();
     return this.instance;
   }
-
 
   addProject(title: string, description: string, manday: number) {
     const newProject = new Project(
@@ -155,12 +154,42 @@ abstract class Component<T extends HTMLElement, U extends HTMLElement> {
   }
 }
 
+/* ProjectItem Class */
+class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
+  private project: Project;
+
+  get manday() {
+    if (this.project.manday < 20) {
+      return this.project.manday.toString() + '人日';
+    } else {
+      return (this.project.manday / 20).toString() + '人月';
+    }
+  }
+
+  constructor(hostId: string, project: Project) {
+    super("single-project", hostId, false, project.id);
+    this.project = project;
+    this.configure();
+    this.renderContent();
+  }
+
+  configure() {}
+
+  renderContent() {
+    this.element.querySelector("h2")!.textContent = this.project.title;
+    this.element.querySelector(
+      "h3"
+    )!.textContent = this.manday;   // TypeScriptのgetter関数はプロパティの様に呼び出す。
+    this.element.querySelector("p")!.textContent = this.project.description;
+  }
+}
+
 /* ProjectList Class */
 class ProjectList extends Component<HTMLDivElement, HTMLElement> {
   assignedProjects: Project[];
 
   constructor(private type: "active" | "finished") {
-    super("project-list", "app", false, `${type}-projects`);   // superの呼び出しが完了するまでthisは使えない
+    super("project-list", "app", false, `${type}-projects`); // superの呼び出しが完了するまでthisは使えない
 
     this.assignedProjects = [];
 
@@ -168,7 +197,8 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
     this.renderContent();
   }
 
-  configure() {   // publicメソッドは一般的にprivateの上に定義するもの
+  configure() {
+    // publicメソッドは一般的にprivateの上に定義するもの
     projectState.addListener((projects: Project[]) => {
       const relevantProjects = projects.filter((prj) => {
         if (this.type === "active") {
@@ -187,9 +217,7 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
     )! as HTMLElement;
     listEl.innerHTML = "";
     for (const prjItem of this.assignedProjects) {
-      const listItem = document.createElement("li");
-      listItem.textContent = prjItem.title;
-      listEl.appendChild(listItem);
+      new ProjectItem(listEl.id, prjItem);
     }
   }
 
@@ -202,7 +230,7 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
 }
 
 /* Project Input class */
-class ProjectInput extends Component<HTMLDivElement, HTMLFormElement>{
+class ProjectInput extends Component<HTMLDivElement, HTMLFormElement> {
   titleInputElement: HTMLInputElement;
   descriptionInputElement: HTMLInputElement;
   mandayInputElement: HTMLInputElement;
