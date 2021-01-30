@@ -1,3 +1,16 @@
+/* Drag & Drop */
+interface Draggable { // 処理を実装することを強制するので、チーム作成時に分かりやすくなる
+  dragStartHandler(event: DragEvent): void;
+
+  dragEndHandler(event: DragEvent): void;
+}
+
+interface DragTarget {
+  dragOverHandler(event: DragEvent): void;
+  dropHandler(event: DragEvent): void;
+  dragLeaveHandler(event: DragEvent): void;
+}
+
 /* Project Type */
 enum ProjectStatus {
   Active,
@@ -49,7 +62,19 @@ class ProjectState extends State<Project> {
     );
 
     this.projects.push(newProject);
+    this.updateListeners();
+  }
 
+  moveProject(projectId: string, newStatus: ProjectStatus) {
+    const project = this.projects.find(prj => prj.id === projectId);
+    if (project && project.status !== newStatus) {
+      project.status = newStatus;
+      this.updateListeners();
+    }
+  }
+
+  @AutoBind
+  private updateListeners() {
     for (const listenerFn of this.listeners) {
       listenerFn(this.projects.slice()); // 配列そのものではなく、コピーを渡す
     }
@@ -155,7 +180,7 @@ abstract class Component<T extends HTMLElement, U extends HTMLElement> {
 }
 
 /* ProjectItem Class */
-class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
+class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> implements Draggable {
   private project: Project;
 
   get manday() {
@@ -173,7 +198,21 @@ class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
     this.renderContent();
   }
 
-  configure() {}
+  @AutoBind
+  dragStartHandler(event: DragEvent): void {
+    event.dataTransfer!.setData('text/plain', this.project.id); // idをプレーンテキストでを渡す
+    event.dataTransfer!.effectAllowed = 'move'; // ブラウザに対してカーソルがどうするかを伝える 新しい場所に追加するということを伝える
+  }
+
+  @AutoBind
+  dragEndHandler(_: DragEvent): void {
+    console.log("Drag終了");
+  }
+
+  configure() {
+    this.element.addEventListener('dragstart', this.dragStartHandler);
+    this.element.addEventListener('dragend', this.dragEndHandler);
+  }
 
   renderContent() {
     this.element.querySelector("h2")!.textContent = this.project.title;
@@ -185,7 +224,7 @@ class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
 }
 
 /* ProjectList Class */
-class ProjectList extends Component<HTMLDivElement, HTMLElement> {
+class ProjectList extends Component<HTMLDivElement, HTMLElement> implements DragTarget {
   assignedProjects: Project[];
 
   constructor(private type: "active" | "finished") {
@@ -197,7 +236,32 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
     this.renderContent();
   }
 
+  @AutoBind
+  dragOverHandler(event: DragEvent): void {
+    if (event.dataTransfer && event.dataTransfer.types[0] === 'text/plain') {
+      event.preventDefault(); // javascriptではこのコードによって、drag&dropだけが許可されるということになる。
+      const listEl = this.element.querySelector('ul')!;
+      listEl.classList.add('droppable');
+    }
+  }
+
+  @AutoBind // thisを参照しているので必要
+  dropHandler(event: DragEvent): void { // defaultではdrag&dropを許可しない。dragイベントを許可してくれるようにpreventDefaultを設定してやる必要がある。
+    const prjId = event.dataTransfer!.getData('text/plain');
+    projectState.moveProject(prjId, this.type === 'active' ? ProjectStatus.Active : ProjectStatus.Finished);
+  }
+
+  @AutoBind
+  dragLeaveHandler(_: DragEvent): void {
+    const listEl = this.element.querySelector('ul')!;
+    listEl.classList.remove('droppable');
+  }
+
   configure() {
+
+    this.element.addEventListener('dragover', this.dragOverHandler);
+    this.element.addEventListener('drop', this.dropHandler);
+    this.element.addEventListener('dragleave', this.dragLeaveHandler);
     // publicメソッドは一般的にprivateの上に定義するもの
     projectState.addListener((projects: Project[]) => {
       const relevantProjects = projects.filter((prj) => {
